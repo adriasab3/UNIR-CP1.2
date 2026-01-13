@@ -20,7 +20,8 @@ pipeline {
                                     export PYTHONPATH="$PWD"
                                     pytest --junitxml=result-unit.xml test/unit
                                 '''
-                                stash name:'unit-res', includes:'result-unit.xml'
+                                //stash name:'unit-res', includes:'result-unit.xml'
+                                junit 'result-unit.xml'
                             }
                         }
                     }
@@ -37,19 +38,22 @@ pipeline {
                                     export PYTHONPATH="$PWD"
                                     pytest --junitxml=result-rest.xml test/rest
                                 '''
-                                stash name:'rest-res', includes:'result-rest.xml'
+                                //stash name:'rest-res', includes:'result-rest.xml'
+                                junit 'result-rest.xml'
                             }
                         }
                     }
                     stage('Static'){
                         steps {
-                           sh 'flake8 --format=pylint --exit-zero app > flake8.out'
-                           recordIssues tools: [flake8(name: 'Flake8', pattern: 'flake8.out')], qualityGates: [[threshold:
+                            unstash name:'code'
+                            sh 'flake8 --format=pylint --exit-zero app > flake8.out'
+                            recordIssues tools: [flake8(name: 'Flake8', pattern: 'flake8.out')], qualityGates: [[threshold:
                     8, type: 'TOTAL', unstable: true],[threshold:10, type: 'TOTAL', unstable: false]]
                         }
                     }
                     stage('Security'){
                         steps {
+                            unstash name:'code'
                             sh 'bandit --exit-zero -r . -f custom -o bandit.out --msg-template "{abspath}:{line}: [{test_id}] {msg}"'
                             recordIssues tools: [pyLint(name:'Bandit', pattern: 'bandit.out')], qualityGates: [[threshold:
                     2, type: 'TOTAL', unstable: true],[threshold:4, type: 'TOTAL', unstable: false]]
@@ -57,6 +61,7 @@ pipeline {
                     }
                     stage('Cobertura'){
                         steps {
+                            unstash name:'code'
                             sh '''
                                 export PYTHONPATH="$PWD"
                                 coverage run --branch --source=app --omit=app/__init__.py,app/api.py -m pytest test/unit
@@ -69,18 +74,12 @@ pipeline {
         }
         stage('Performance') {
             steps {
+                unstash name:'code'
                 sh '''
                     export FLASK_APP=app/api.py
                     /usr/local/bin/apache-jmeter-5.6.3/bin/jmeter -n -t /usr/local/bin/apache-jmeter-5.6.3/ThreadGroup.jmx -f -l flask.jtl
                 '''
                 perfReport sourceDataFiles: 'flask.jtl'
-            }
-        }
-        stage('Results') {
-            steps {
-                unstash name:'unit-res'
-                unstash name:'rest-res'
-                junit 'result*.xml'
             }
         }
     }
