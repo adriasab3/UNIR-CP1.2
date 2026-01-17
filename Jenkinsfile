@@ -20,7 +20,6 @@ pipeline {
                                     export PYTHONPATH="$PWD"
                                     pytest --junitxml=result-unit.xml test/unit
                                 '''
-                                //stash name:'unit-res', includes:'result-unit.xml'
                                 junit 'result-unit.xml'
                             }
                         }
@@ -32,13 +31,11 @@ pipeline {
                                 sh '''
                                     export FLASK_APP=app/api.py
                                     flask run &
-                                    sleep 10
                                     java  -jar /var/lib/jenkins/wiremock-standalone-3.13.2.jar --port 9090 --root-dir test/wiremock/ &
                                     sleep 10
                                     export PYTHONPATH="$PWD"
                                     pytest --junitxml=result-rest.xml test/rest
                                 '''
-                                //stash name:'rest-res', includes:'result-rest.xml'
                                 junit 'result-rest.xml'
                             }
                         }
@@ -74,7 +71,6 @@ pipeline {
             steps {
                 unstash name:'code'
                 sh '''
-                    export FLASK_APP=app/api.py
                     /usr/local/bin/apache-jmeter-5.6.3/bin/jmeter -n -t /usr/local/bin/apache-jmeter-5.6.3/ThreadGroup.jmx -f -l flask.jtl
                 '''
                 perfReport sourceDataFiles: 'flask.jtl'
