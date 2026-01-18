@@ -18,6 +18,39 @@ pipeline {
         }
         stage('Tests') {
             parallel {
+                stage ('Agente Principal') {
+                    agent {label 'principal'}
+                    stages {
+                        stage('Security'){
+                            steps {
+                                unstash name:'code'
+                                sh 'bandit --exit-zero -r . -f custom -o bandit.out --msg-template "{abspath}:{line}: [{test_id}] {msg}"'
+                                recordIssues tools: [pyLint(name:'Bandit', pattern: 'bandit.out')], qualityGates: [[threshold: 2, type: 'TOTAL', unstable: true],[threshold:4, type: 'TOTAL', unstable: false]]
+                                sh '''
+                                    whoami
+                                    hostname
+                                '''
+                                echo "${WORKSPACE}"
+                            }
+                        }
+                        stage('Cobertura'){
+                            steps {
+                                unstash name:'code'
+                                sh '''
+                                    export PYTHONPATH="$PWD"
+                                    coverage run --branch --source=app --omit=app/__init__.py,app/api.py -m pytest test/unit
+                                    coverage xml
+                                '''
+                                recordCoverage qualityGates: [[criticality: 'ERROR', integerThreshold: 85, metric: 'LINE', threshold: 85.0], [criticality: 'NOTE', integerThreshold: 95, metric: 'LINE', threshold: 95.0], [criticality: 'ERROR', integerThreshold: 80, metric: 'BRANCH', threshold: 80.0], [criticality: 'NOTE', integerThreshold: 90, metric: 'BRANCH', threshold: 90.0]], tools: [[parser: 'COBERTURA', pattern: 'coverage.xml']]
+                                sh '''
+                                    whoami
+                                    hostname
+                                '''
+                                echo "${WORKSPACE}"
+                            }
+                        }
+                    }
+                }
                 stage('Agente Secundario 1') {
                     agent { label 'secundario' }
                     stages {
@@ -50,22 +83,6 @@ pipeline {
                                 echo "${WORKSPACE}"
                             }
                         }
-                        stage('Cobertura'){
-                            steps {
-                                unstash name:'code'
-                                sh '''
-                                    export PYTHONPATH="$PWD"
-                                    coverage run --branch --source=app --omit=app/__init__.py,app/api.py -m pytest test/unit
-                                    coverage xml
-                                '''
-                                recordCoverage qualityGates: [[criticality: 'ERROR', integerThreshold: 85, metric: 'LINE', threshold: 85.0], [criticality: 'NOTE', integerThreshold: 95, metric: 'LINE', threshold: 95.0], [criticality: 'ERROR', integerThreshold: 80, metric: 'BRANCH', threshold: 80.0], [criticality: 'NOTE', integerThreshold: 90, metric: 'BRANCH', threshold: 90.0]], tools: [[parser: 'COBERTURA', pattern: 'coverage.xml']]
-                                sh '''
-                                    whoami
-                                    hostname
-                                '''
-                                echo "${WORKSPACE}"
-                            }
-                        }
                     }
                 }
                 stage('Agente Secundario 2') {
@@ -90,18 +107,6 @@ pipeline {
                                     '''
                                     echo "${WORKSPACE}"
                                 }
-                            }
-                        }
-                        stage('Security'){
-                            steps {
-                                unstash name:'code'
-                                sh 'bandit --exit-zero -r . -f custom -o bandit.out --msg-template "{abspath}:{line}: [{test_id}] {msg}"'
-                                recordIssues tools: [pyLint(name:'Bandit', pattern: 'bandit.out')], qualityGates: [[threshold: 2, type: 'TOTAL', unstable: true],[threshold:4, type: 'TOTAL', unstable: false]]
-                                sh '''
-                                    whoami
-                                    hostname
-                                '''
-                                echo "${WORKSPACE}"
                             }
                         }
                         stage('Performance') {
