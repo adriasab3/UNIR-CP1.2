@@ -12,18 +12,6 @@ pipeline {
         }
         stage('Tests') {
             stages {
-                    stage('Unit'){
-                        steps {
-                            catchError(buildResult: 'SUCCESS', stageResult: 'SUCCESS') {
-                                unstash name:'code'
-                                sh '''
-                                    export PYTHONPATH="$PWD"
-                                    pytest --junitxml=result-unit.xml test/unit
-                                '''
-                                junit 'result-unit.xml'
-                            }
-                        }
-                    }
                     stage('Rest'){
                         steps {
                             catchError(buildResult: 'SUCCESS', stageResult: 'SUCCESS') {
@@ -61,10 +49,24 @@ pipeline {
                             unstash name:'code'
                             sh '''
                                 export PYTHONPATH="$PWD"
-                                coverage run --branch --source=app --omit=app/__init__.py,app/api.py -m pytest test/unit
+                                coverage run --branch --source=app --omit=app/__init__.py,app/api.py -m pytest --junitxml=result-unit.xml test/unit
                                 coverage xml
                             '''
                             recordCoverage qualityGates: [[criticality: 'ERROR', integerThreshold: 85, metric: 'LINE', threshold: 85.0], [criticality: 'NOTE', integerThreshold: 95, metric: 'LINE', threshold: 95.0], [criticality: 'ERROR', integerThreshold: 80, metric: 'BRANCH', threshold: 80.0], [criticality: 'NOTE', integerThreshold: 90, metric: 'BRANCH', threshold: 90.0]], tools: [[parser: 'COBERTURA', pattern: 'coverage.xml']]
+                            stash name:'unit-res', includes:'result-unit.xml'
+                        }
+                    }
+                    stage('Unit'){
+                        steps {
+                            catchError(buildResult: 'SUCCESS', stageResult: 'SUCCESS') {
+                                //unstash name:'code'
+                                /*sh '''
+                                   // export PYTHONPATH="$PWD"
+                                    //pytest --junitxml=result-unit.xml test/unit
+                                '''*/
+                                unstash name:'unit-res'
+                                junit 'result-unit.xml'
+                            }
                         }
                     }
                     stage('Performance') {
