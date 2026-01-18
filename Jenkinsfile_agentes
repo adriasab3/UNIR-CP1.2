@@ -7,7 +7,8 @@ pipeline {
         stage('Get Code'){
             agent { label 'principal' }
             steps {
-                git 'https://github.com/anieto-unir/helloworld.git'
+                //git 'https://github.com/anieto-unir/helloworld.git'
+                git branch: 'feature_fix_coverage', url: 'https://github.com/adriasab3/UNIR-CP1.2.git'
                 stash name:'code', includes:'**/*'
                 sh '''
                     whoami
@@ -60,24 +61,6 @@ pipeline {
                         }
                     }
                 }
-                        stage('Unit'){
-                            agent { label 'secundario' }
-                            steps {
-                                catchError(buildResult: 'SUCCESS', stageResult: 'SUCCESS') {
-                                    unstash name:'code'
-                                    sh '''
-                                        export PYTHONPATH="$PWD"
-                                        pytest --junitxml=result-unit.xml test/unit
-                                    '''
-                                    sh '''
-                                        whoami
-                                        hostname
-                                    '''
-                                    echo "${WORKSPACE}"
-                                    junit 'result-unit.xml'
-                                }
-                            }
-                        }
                         stage('Static'){
                             agent { label 'secundario' }
                             steps {
@@ -105,25 +88,42 @@ pipeline {
                                     echo "${WORKSPACE}"
                                 }
                         }
-                        stage('Cobertura'){
-                                agent { label 'secundario' }
-                                steps {
-                                    unstash name:'code'
-                                    sh '''
-                                        export PYTHONPATH="$PWD"
-                                        coverage run --branch --source=app --omit=app/__init__.py,app/api.py -m pytest test/unit
-                                        coverage xml
-                                    '''
-                                    recordCoverage qualityGates: [[criticality: 'ERROR', integerThreshold: 85, metric: 'LINE', threshold: 85.0], [criticality: 'NOTE', integerThreshold: 95, metric: 'LINE', threshold: 95.0], [criticality: 'ERROR', integerThreshold: 80, metric: 'BRANCH', threshold: 80.0], [criticality: 'NOTE', integerThreshold: 90, metric: 'BRANCH', threshold: 90.0]], tools: [[parser: 'COBERTURA', pattern: 'coverage.xml']]
+                        stage ('Cobertura and Unit'){
+                            agent { label 'secundario' }
+                            stages {
+                                stage('Cobertura'){
+                                        steps {
+                                            unstash name:'code'
+                                            sh '''
+                                                export PYTHONPATH="$PWD"
+                                                coverage run --branch --source=app --omit=app/__init__.py,app/api.py -m pytest --junitxml=result-unit.xml test/unit
+                                                coverage xml
+                                            '''
+                                            recordCoverage qualityGates: [[criticality: 'ERROR', integerThreshold: 85, metric: 'LINE', threshold: 85.0], [criticality: 'NOTE', integerThreshold: 95, metric: 'LINE', threshold: 95.0], [criticality: 'ERROR', integerThreshold: 80, metric: 'BRANCH', threshold: 80.0], [criticality: 'NOTE', integerThreshold: 90, metric: 'BRANCH', threshold: 90.0]], tools: [[parser: 'COBERTURA', pattern: 'coverage.xml']]
+                                            sh '''
+                                                whoami
+                                                hostname
+                                            '''
+                                            echo "${WORKSPACE}"
+                                            stash name:'unit-res', includes:'result-unit.xml'
+                                            cleanWs()
+                                        }
+                                    }
+                                stage('Unit'){
+                            steps {
+                                catchError(buildResult: 'SUCCESS', stageResult: 'SUCCESS') {
+                                    unstash name:'unit-res'
                                     sh '''
                                         whoami
                                         hostname
                                     '''
                                     echo "${WORKSPACE}"
-                                    cleanWs()
+                                    junit 'result-unit.xml'
                                 }
                             }
-                        
+                        }
+                            }
+                        }
                         }
     }
     }
