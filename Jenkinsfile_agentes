@@ -41,6 +41,7 @@ pipeline {
                                         hostname
                                     '''
                                     echo "${WORKSPACE}"
+                                    cleanWs()
                                 }
                             }
                         }
@@ -86,6 +87,7 @@ pipeline {
                                         hostname
                                     '''
                                     echo "${WORKSPACE}"
+                                    cleanWs()
                                 }
                         }
                         stage ('Cobertura and Unit'){
@@ -119,6 +121,7 @@ pipeline {
                                     '''
                                     echo "${WORKSPACE}"
                                     junit 'result-unit.xml'
+                                    cleanWs()
                                 }
                             }
                         }
